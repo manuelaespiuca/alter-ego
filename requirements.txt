@@ -1,0 +1,3 @@
+eel
+google-genai
+python-dotenv

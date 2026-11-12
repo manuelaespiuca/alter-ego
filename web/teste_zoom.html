@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste de zoom das expressões</title>
+  <style>
+    :root { --verde: #4dff4d; --claro: #d8ffd8; --borda: rgba(77,255,77,.25); }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 18px; background: #000; color: var(--verde);
+           font: 13px/1.45 Consolas, "Courier New", monospace; }
+    h1 { margin: 0 0 4px; font-size: 16px; }
+    p.dica { margin: 0 0 14px; color: #9fdc9f; }
+    .barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+    button { background: #000; color: var(--verde); border: 1px solid var(--borda); padding: 6px 12px;
+             font: inherit; cursor: pointer; border-radius: 2px; }
+    button:hover { background: #062006; }
+    button.ativo { background: var(--verde); color: #000; font-weight: bold; }
+    label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; margin-left: 8px; }
+    .sep { width: 1px; height: 22px; background: var(--borda); margin: 0 6px; }
+
+    .palco { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; }
+    .item { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+    .rotulo { font-weight: bold; color: var(--claro); }
+    .rotulo small { color: #9fdc9f; font-weight: normal; }
+
+    .monitor { position: relative; width: min(46vw, 640px); aspect-ratio: 1.79 / 1; overflow: hidden;
+               background: #000; border-radius: 3px; box-shadow: 0 0 0 1px #1f5f1f, 0 0 16px rgba(120,255,120,.35); }
+    .monitor.unico { width: min(88vw, 880px); }
+    .monitor.mini { width: min(30vw, 300px); }
+    .monitor img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+    /* Linhas-guia: iguais em todas as imagens, para ver se rosto/olhos/colar coincidem */
+    .guias { position: absolute; inset: 0; pointer-events: none; display: none; }
+    body.com-guias .guias { display: block; }
+    .guias i { position: absolute; background: rgba(255,60,60,.85); }
+    .guias .v { top: 0; bottom: 0; width: 1px; }
+    .guias .h { left: 0; right: 0; height: 1px; }
+    .guias b { position: absolute; left: 6px; font-size: 10px; color: #ff8080; font-weight: normal; }
+
+    .miniaturas { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 14px; }
+    .secao { margin: 18px 0 8px; color: var(--claro); text-align: center; font-weight: bold; }
+    .grade { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+    #status { color: #9fdc9f; margin-left: auto; }
+  </style>
+</head>
+<body>
+  <h1>Teste de zoom das expressões</h1>
+  <p class="dica">Antes = <code>web/expressoes</code> (originais) · Depois = <code>web/expressoes_normalizadas</code>.
+    Atalhos: ← → trocam de expressão, <b>A</b> alterna antes/depois, <b>G</b> liga as linhas-guia, <b>Espaço</b> pisca antes/depois.</p>
+
+  <div class="barra" id="barra-modo">
+    <button data-modo="depois">Depois</button>
+    <button data-modo="antes">Antes</button>
+    <button data-modo="lado">Lado a lado</button>
+    <button data-modo="grade">Todas (grade)</button>
+    <span class="sep"></span>
+    <button id="btn-piscar">Piscar antes/depois</button>
+    <button id="btn-ciclo">Percorrer expressões</button>
+    <label><input type="checkbox" id="chk-guias"> linhas-guia</label>
+    <span id="status"></span>
+  </div>
+
+  <div id="area"></div>
+  <div class="miniaturas" id="miniaturas"></div>
+
+  <script>
+    const EXPRESSOES = ["neutro", "feliz", "timido", "preocupado", "pensativo", "triste", "surpreso"];
+    const PASTAS = { antes: "expressoes", depois: "expressoes_normalizadas" };
+    const NOMES = { antes: "ANTES (original)", depois: "DEPOIS (zoom igualado)" };
+
+    const area = document.getElementById("area");
+    const miniaturas = document.getElementById("miniaturas");
+    const status = document.getElementById("status");
+
+    let modo = "depois";
+    let idx = 0;
+    let timerPiscar = null;
+    let timerCiclo = null;
+
+    // Mesmas extensões que o script.js aceita. FONTES guarda o caminho que realmente existe.
+    const EXTENSOES = ["jpg", "jpeg", "png", "webp"];
+    const FONTES = { antes: {}, depois: {} };
+    const src = (versao, nome) => FONTES[versao][nome] || `${PASTAS[versao]}/${nome}.${EXTENSOES[0]}`;
+
+    function descobrir(versao, nome) {
+      return new Promise((resolve) => {
+        let i = 0;
+        const tentar = () => {
+          if (i >= EXTENSOES.length) return resolve(); // não achou: fica o caminho padrão (imagem quebrada)
+          const caminho = `${PASTAS[versao]}/${nome}.${EXTENSOES[i++]}`;
+          const img = new Image();
+          img.onload = () => { FONTES[versao][nome] = caminho; resolve(); };
+          img.onerror = tentar;
+          img.src = caminho;
+        };
+        tentar();
+      });
+    }
+
+    // Posições (em %) tiradas da imagem "neutro" normalizada: centro, olhos, colar e laterais do cabelo.
+    const GUIAS = [
+      ["v", 50, ""], ["v", 25, ""], ["v", 75, ""],
+      ["h", 37, "olhos"], ["h", 73, "colar"],
+    ];
+
+    function monitor(versao, nome, classe = "") {
+      const guias = GUIAS.map(([t, p, txt]) =>
+        `<i class="${t}" style="${t === "v" ? "left" : "top"}:${p}%"></i>` +
+        (txt ? `<b style="top:calc(${p}% - 14px)">${txt}</b>` : "")).join("");
+      return `<div class="monitor ${classe}"><img src="${src(versao, nome)}" alt="${nome}">` +
+             `<div class="guias">${guias}</div></div>`;
+    }
+
+    function item(versao, nome, classe) {
+      return `<div class="item">${monitor(versao, nome, classe)}` +
+             `<div class="rotulo">${NOMES[versao]} <small>· ${nome}</small></div></div>`;
+    }
+
+    function desenhar() {
+      const nome = EXPRESSOES[idx];
+      if (modo === "grade") {
+        area.innerHTML = ["antes", "depois"].map((v) =>
+          `<div class="secao">${NOMES[v]}</div><div class="grade">` +
+          EXPRESSOES.map((n) => `<div class="item">${monitor(v, n, "mini")}<div class="rotulo"><small>${n}</small></div></div>`).join("") +
+          `</div>`).join("");
+        miniaturas.style.display = "none";
+      } else {
+        area.innerHTML = `<div class="palco">` +
+          (modo === "lado" ? item("antes", nome, "") + item("depois", nome, "")
+                           : item(modo, nome, "unico")) + `</div>`;
+        miniaturas.style.display = "flex";
+      }
+      miniaturas.innerHTML = EXPRESSOES.map((n, i) =>
+        `<button data-i="${i}" class="${i === idx ? "ativo" : ""}">${n}</button>`).join("");
+      document.querySelectorAll("#barra-modo [data-modo]").forEach((b) =>
+        b.classList.toggle("ativo", b.dataset.modo === modo));
+      status.textContent = modo === "grade" ? "" : `${nome} (${idx + 1}/${EXPRESSOES.length})`;
+    }
+
+    function definirModo(m) { modo = m; desenhar(); }
+    function trocarExpressao(delta) { idx = (idx + delta + EXPRESSOES.length) % EXPRESSOES.length; desenhar(); }
+
+    function alternarPiscar() {
+      const btn = document.getElementById("btn-piscar");
+      if (timerPiscar) {
+        clearInterval(timerPiscar); timerPiscar = null; btn.classList.remove("ativo"); return;
+      }
+      if (modo === "lado" || modo === "grade") modo = "depois";
+      btn.classList.add("ativo");
+      timerPiscar = setInterval(() => { modo = modo === "antes" ? "depois" : "antes"; desenhar(); }, 800);
+      desenhar();
+    }
+
+    function alternarCiclo() {
+      const btn = document.getElementById("btn-ciclo");
+      if (timerCiclo) {
+        clearInterval(timerCiclo); timerCiclo = null; btn.classList.remove("ativo"); return;
+      }
+      if (modo === "grade") modo = "depois";
+      btn.classList.add("ativo");
+      timerCiclo = setInterval(() => trocarExpressao(1), 1200);
+      desenhar();
+    }
+
+    document.getElementById("barra-modo").addEventListener("click", (ev) => {
+      const m = ev.target.dataset && ev.target.dataset.modo;
+      if (m) {
+        if (timerPiscar) alternarPiscar();
+        definirModo(m);
+      }
+    });
+    miniaturas.addEventListener("click", (ev) => {
+      if (ev.target.dataset.i !== undefined) { idx = Number(ev.target.dataset.i); desenhar(); }
+    });
+    document.getElementById("btn-piscar").addEventListener("click", alternarPiscar);
+    document.getElementById("btn-ciclo").addEventListener("click", alternarCiclo);
+
+    const chk = document.getElementById("chk-guias");
+    chk.addEventListener("change", () => document.body.classList.toggle("com-guias", chk.checked));
+
+    document.addEventListener("keydown", (ev) => {
+      const k = ev.key.toLowerCase();
+      if (k === "arrowright") trocarExpressao(1);
+      else if (k === "arrowleft") trocarExpressao(-1);
+      else if (k === "a") definirModo(modo === "antes" ? "depois" : "antes");
+      else if (k === "g") { chk.checked = !chk.checked; chk.dispatchEvent(new Event("change")); }
+      else if (k === " ") { ev.preventDefault(); alternarPiscar(); }
+    });
+
+    // Descobre a extensão e carrega todas as imagens de antemão (a troca fica instantânea); depois desenha.
+    Promise.all(EXPRESSOES.flatMap((n) => Object.keys(PASTAS).map((v) => descobrir(v, n)))).then(desenhar);
+  </script>
+</body>
+</html>

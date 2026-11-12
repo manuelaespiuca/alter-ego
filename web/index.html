@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alter Ego Terminal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <button id="btn-idioma" class="idioma" type="button" title="Idioma / Language">PT | EN</button>
+  <div class="tela">
+    <main class="palco">
+      <div class="monitor" id="monitor">
+        <img id="avatar" class="avatar" alt="Alter Ego" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">
+      </div>
+    </main>
+
+    <section class="console">
+      <div class="terminal" id="terminal" title="Clique para pular a animação"></div>
+      <form id="form" class="entrada" autocomplete="off">
+        <label class="prompt" for="campo">&gt;&gt; Entrada:</label>
+        <input id="campo" type="text" maxlength="1000" autofocus>
+        <button id="btn-enviar" type="submit">ENVIAR</button>
+      </form>
+    </section>
+  </div>
+
+  <script type="text/javascript" src="/eel.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

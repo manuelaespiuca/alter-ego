@@ -1,0 +1,8 @@
+.env
+data/
+alter_ego.log
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
