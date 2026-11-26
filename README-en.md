@@ -233,7 +233,7 @@ Never put your key inside the app: whoever receives the program pastes their own
 
 ## Disclaimer
 
-This is a fan project. Alter Ego is an artificial intelligence program from *Danganronpa: Trigger Happy Havoc*, and this project has no affiliation with the game's creators or publisher. The version here is original and feminine, inspired by that program but created as the author's own alter ego. The MIT license covers only the code: the original Alter Ego and any third-party material are not part of it.
+This is a fan project with no connection to the creators or publisher of Danganronpa: Trigger Happy Havoc. The original Alter Ego is an artificial intelligence program from the game. This version is original, inspired by it and created as the author's own alter ego. The MIT license covers only the code and does not apply to the original Alter Ego or to any third-party material.
 
 ## License
 
